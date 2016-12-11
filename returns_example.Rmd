@@ -1,0 +1,130 @@
+---
+title: "R Notebook"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE,fig.width=10, fig.height=6)
+```
+
+Source of this exercise: http://blog.revolutionanalytics.com/2014/01/quantitative-finance-applications-in-r-plotting-xts-time-series.html
+
+# Data Fetching
+
+To start, let’s look at five sets of cumulative returns for the following ETF’s:
+
+[SPY SPDR S&P 500 ETF Trust](https://www.google.com/finance?cid=700145)
+
+[QQQ PowerShares NASDAQ QQQ Trust](https://www.google.com/finance?q=NASDAQ%3AQQQ&ei=ddbeUuqkILK0iAL8xwE)
+
+[GDX Market Vectors Gold Miners ETF](https://www.google.com/finance?q=NYSEARCA%3AGDX&ei=pdbeUtGXJ6qtiAKeggE)
+
+[DBO PowerShares DB Oil Fund (ETF)](https://www.google.com/finance?q=NYSEARCA%3ADBO&ei=49beUvD6OqqtiAKeggE)
+
+[VWO Vanguard FTSE Emerging Markets ETF](https://www.google.com/finance?q=vwo&ei=JtfeUrjMGKqtiAKeggE)
+
+Extract the data using quantmod
+```{r}
+library(quantmod)
+tckrs <- c("SPY", "QQQ", "GDX", "DBO", "VWO")
+getSymbols(tckrs, from = "2007-01-01")
+
+# Extract closing prices only
+SPY.Close <- SPY[,4]
+QQQ.Close <- QQQ[,4]
+GDX.Close <- GDX[,4]
+DBO.Close <- DBO[,4]
+VWO.Close <- VWO[,4]
+
+```
+
+Create the cumulative returns by dividing by the first price.
+```{r}
+# First() returns xts object and by default math ops will only operate on intersection of dates, so need to convert to as.numeric()
+
+# Example dumps the returns back to the orig object, so just doing that
+SPY <- SPY.Close / as.numeric(first(SPY.Close))
+QQQ <- QQQ.Close / as.numeric(first(QQQ.Close))
+GDX <- GDX.Close / as.numeric(first(GDX.Close))
+DBO <- DBO.Close / as.numeric(first(DBO.Close))
+VWO <- VWO.Close / as.numeric(first(VWO.Close))
+```
+
+Now merge the XTS objects back into one.
+```{r}
+basket <- cbind(SPY, QQQ, GDX, DBO, VWO, fill = 1)
+head(basket)
+```
+In this case the merge() produces the union of all dates, and fills NAs by default. There were two NAs, so I just filled them with 1 since they were in the beg of the series.
+
+# Plotting
+
+## Zoo plot(.)
+We will now look how we can plot all five series, overlayed on a single graph.  In particular, we will look at the plot(.) functions in both the zoo and xts packages.  The plot(.) function provided in zoo is very simple to use, as we can use the whole zoo.basket object as input, and the plot(.) function will overlay the time series and scale the vertical axis for us with the help of a single parameter setting, namely the screens parameter.
+
+*Last, but crucial, is the parameter setting screens = 1, which tells the plot command to overlay each series in a single graph.*
+```{r}
+# first, coerce back to a zoo object.  
+zoo.basket <- as.zoo(basket)
+
+# Set a color scheme:
+tsRainbow <- rainbow(ncol(zoo.basket))
+# Plot the overlayed series
+plot(x = zoo.basket, ylab = "Cumulative Return", main = "Cumulative Returns",
+        col = tsRainbow, screens = 1)
+# Set a legend in the upper left hand corner to match color to return series
+legend(x = "topleft", legend = c("SPY", "QQQ", "GDX", "DBO", "VWO"), 
+       lty = 1,col = tsRainbow)
+```
+
+### With custom colors
+```{r}
+myColors <- c("red", "darkgreen", "goldenrod", "darkblue", "darkviolet")
+# Plot the overlayed series
+plot(x = zoo.basket, ylab = "Cumulative Return", main = "Cumulative Returns",
+        col = myColors, screens = 1)
+# Set a legend in the upper left hand corner to match color to return series
+legend(x = "topleft", legend = c("SPY", "QQQ", "GDX", "DBO", "VWO"), 
+       lty = 1,col = myColors)
+```
+
+## XTS plot(.)
+
+Not as convenient as the zoo plot
+- we can no longer input the entire “matrix” object; we must add each series separately in order to layer the plots.
+- We also need to specify the scale along the vertical axis, as in the xts case, the function will not do this on the fly as it did for us in the zoo case.
+
+Use basket instead of zoo.basket; plot() will know to use the xts version of plot()
+
+```{r}
+plot(x = basket[,"SPY.Close"], xlab = "Time", ylab = "Cumulative Return",
+main = "Cumulative Returns", ylim = c(0.0, 2.5), major.ticks= "years",
+        minor.ticks = FALSE, col = "red")
+lines(x = basket[,"QQQ.Close"], col = "darkgreen")
+lines(x = basket[,"GDX.Close"], col = "goldenrod")
+lines(x = basket[,"DBO.Close"], col = "darkblue")
+lines(x = basket[,"VWO.Close"], col = "darkviolet")
+legend(x = 'topleft', legend = c("SPY", "QQQ", "GDX", "DBO", "VWO"),
+      lty = 1, col = myColors)
+```
+
+
+# Plot daily changes
+```{r}
+basket_close <- merge (SPY.Close, QQQ.Close, GDX.Close, DBO.Close, VWO.Close)
+basket_returns<- (basket_close / lag.xts(basket_close)) -1
+basket_returns["2008-06-18","VWO.Close"] <- 0
+basket_returns_matrix <- as.matrix(basket_returns)
+boxplot(basket_returns_matrix)
+plot(GDX.Close)
+min(VWO.Close/lag(VWO.Close), na.rm = T)
+t <- merge(GDX.Close, (GDX.Close/lag(GDX.Close)) -1)
+
+t[t[,2]==max(t[,2], na.rm = T)]
+str(VWO.Close)
+GDX.Close["2008-11/12"]
+str(basket_returns[SPY.Close])
+```
+
