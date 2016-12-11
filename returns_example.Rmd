@@ -126,5 +126,7 @@ t[t[,2]==max(t[,2], na.rm = T)]
 str(VWO.Close)
 GDX.Close["2008-11/12"]
 str(basket_returns[SPY.Close])
+
+
 ```
 
